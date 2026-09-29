@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Personal notes and roadmap (not part of the project)
+CLAUDE.md
+CLAUDE_LEARNING_TRACKER.md
+.claude/
+
+# Personal photos
+photo_*.jpg

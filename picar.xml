@@ -1,0 +1,282 @@
+<!--
+  A robot car modeled after the Adeept PiCar Pro V2 (MuJoCo model).
+  Units: meters and radians. Coordinates: x = forward, y = left, z = up.
+  Parts: two-layer chassis, front wheels steered by a servo, rear wheels driven by motors,
+  4-DOF arm + parallel gripper, camera on the arm, front camera, sonar and headlights.
+-->
+<mujoco model="picar_pro">
+  <!-- angle="radian": all angles (range, ctrlrange) are in radians. MJCF defaults to degrees! -->
+  <compiler angle="radian"/>
+
+  <!-- implicitfast: keeps wheels and servos stable.
+       cone="elliptic" + impratio="10": more accurate friction, so grasped objects don't slip.
+       noslip_iterations="5": extra solver pass that stops held objects from slowly creeping out. -->
+  <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="10" noslip_iterations="5"/>
+
+  <!-- statistic: where the viewer's free camera looks.
+       center = robot center, extent = scene "size" (smaller = camera starts closer) -->
+  <statistic center="0 0 0.12" extent="0.35"/>
+
+  <visual>
+    <!-- global: initial camera angle (degrees) -->
+    <global azimuth="150" elevation="-20"/>
+    <!-- znear: lets the camera get very close without clipping (relative to extent) -->
+    <map znear="0.005"/>
+    <!-- headlight: light attached to the viewer camera. Higher ambient keeps shaded parts visible -->
+    <headlight ambient="0.35 0.35 0.35" diffuse="0.6 0.6 0.6" specular="0.1 0.1 0.1"/>
+  </visual>
+
+  <asset>
+    <texture name="sky" type="skybox" builtin="gradient" rgb1="0.4 0.6 0.8" rgb2="0.05 0.05 0.1" width="512" height="512"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.25 0.27 0.3" rgb2="0.32 0.34 0.38" width="512" height="512"/>
+    <material name="floor_mat" texture="grid" texrepeat="8 8" reflectance="0.1"/>
+    <!-- emission: looks self-illuminated (headlights, screen) -->
+    <material name="headlight_mat" rgba="1 0.9 0.4 1" emission="1"/>
+    <material name="oled_mat" rgba="0.2 0.5 1 1" emission="0.6"/>
+    <!-- Robot materials. specular = highlight strength, shininess = how sharp the highlight is.
+         Black parts use different darkness and gloss so they stay distinguishable. -->
+    <material name="acrylic" rgba="0.05 0.05 0.06 1" specular="0.8" shininess="0.9"/>        <!-- glossy black acrylic plate -->
+    <material name="aluminum" rgba="0.3 0.31 0.33 1" specular="0.6" shininess="0.5"/>        <!-- dark gray metal (arm) -->
+    <material name="servo" rgba="0.1 0.1 0.11 1" specular="0.2" shininess="0.2"/>          <!-- matte black servo -->
+    <material name="plastic_black" rgba="0.07 0.07 0.07 1" specular="0.3" shininess="0.3"/>  <!-- camera housing -->
+    <material name="rubber" rgba="0.04 0.04 0.04 1" specular="0" shininess="0"/>          <!-- rubber tire -->
+    <material name="hub_metal" rgba="0.62 0.68 0.74 1" specular="0.7" shininess="0.6"/>     <!-- wheel hub -->
+    <material name="steel" rgba="0.72 0.73 0.75 1" specular="0.9" shininess="0.8"/>        <!-- steel: fingers, sonar -->
+    <material name="brass" rgba="0.7 0.55 0.25 1" specular="0.8" shininess="0.7"/>         <!-- brass standoffs -->
+    <material name="pcb_green" rgba="0.05 0.3 0.12 1" specular="0.4" shininess="0.5"/>     <!-- Raspberry Pi board -->
+    <material name="pcb_blue" rgba="0.05 0.18 0.45 1" specular="0.4" shininess="0.5"/>     <!-- sonar board -->
+    <material name="battery" rgba="0.12 0.12 0.13 1" specular="0.1" shininess="0.1"/>       <!-- battery holder -->
+    <material name="tt_motor" rgba="0.85 0.68 0.1 1" specular="0.3" shininess="0.3"/>      <!-- yellow TT motor -->
+    <material name="lens" rgba="0.05 0.08 0.2 1" specular="1" shininess="1"/>             <!-- camera lens -->
+  </asset>
+
+  <!-- default: write shared properties once and reuse them through "class" -->
+  <default>
+    <!-- visual: appearance only. Collides with nothing (contype/conaffinity=0), weightless (density=0) -->
+    <default class="visual">
+      <geom contype="0" conaffinity="0" density="0"/>
+    </default>
+    <!-- wheel: tire. zaxis="0 1 0" turns the cylinder axis toward y -->
+    <default class="wheel">
+      <geom type="cylinder" size="0.045 0.016" zaxis="0 1 0" material="rubber"
+            friction="1.5 0.005 0.0001" mass="0.05"/>
+    </default>
+    <!-- hub: metal wheel disc (visual only) -->
+    <default class="hub">
+      <geom type="cylinder" size="0.028 0.0165" zaxis="0 1 0" material="hub_metal"
+            contype="0" conaffinity="0" density="0"/>
+    </default>
+    <!-- arm_link: arm segments (dark aluminum) -->
+    <default class="arm_link">
+      <geom type="box" material="aluminum" contype="0" conaffinity="0" mass="0.03"/>
+      <joint type="hinge" armature="0.01" damping="0.2"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <light pos="1 1 1.5" dir="-1 -1 -1" diffuse="0.4 0.4 0.4" castshadow="false"/>
+    <geom name="floor" type="plane" size="3 3 0.1" material="floor_mat"/>
+
+    <!-- ===================== ROBOT ===================== -->
+    <!-- z=0.07: wheel radius 0.045 + wheels sit 0.015 below the chassis = 0.06, dropped from slightly above -->
+    <body name="chassis" pos="0 0 0.07">
+      <freejoint name="chassis_free"/>
+
+      <!-- Lower plate (main body) -->
+      <geom name="lower_plate" type="box" size="0.12 0.06 0.003" material="acrylic"/>
+      <!-- 18650 battery holder (keeps the center of mass low) -->
+      <geom name="battery_box" type="box" size="0.06 0.035 0.016" pos="-0.01 0 0.02" material="battery"/>
+      <!-- 4 brass standoffs holding the two plates -->
+      <geom class="visual" type="cylinder" size="0.003 0.022" pos="0.08 0.045 0.025" material="brass"/>
+      <geom class="visual" type="cylinder" size="0.003 0.022" pos="0.08 -0.045 0.025" material="brass"/>
+      <geom class="visual" type="cylinder" size="0.003 0.022" pos="-0.08 0.045 0.025" material="brass"/>
+      <geom class="visual" type="cylinder" size="0.003 0.022" pos="-0.08 -0.045 0.025" material="brass"/>
+      <!-- Upper plate -->
+      <geom name="upper_plate" type="box" size="0.1 0.055 0.003" pos="0 0 0.048" material="acrylic"/>
+      <!-- Raspberry Pi + Robot HAT -->
+      <geom class="visual" type="box" size="0.04 0.03 0.006" pos="-0.045 0 0.057" material="pcb_green"/>
+      <!-- OLED screen -->
+      <geom class="visual" type="box" size="0.012 0.015 0.003" pos="0.08 0 0.054" material="oled_mat"/>
+      <!-- Rear motors (yellow TT motors) -->
+      <geom class="visual" type="cylinder" size="0.012 0.022" pos="-0.09 0.045 -0.015" zaxis="0 1 0" material="tt_motor"/>
+      <geom class="visual" type="cylinder" size="0.012 0.022" pos="-0.09 -0.045 -0.015" zaxis="0 1 0" material="tt_motor"/>
+      <!-- Steering servo -->
+      <geom class="visual" type="box" size="0.02 0.01 0.012" pos="0.08 0 -0.012" material="servo"/>
+
+      <!-- Front sonar (ultrasonic sensor): blue board + two transducers -->
+      <geom class="visual" type="box" size="0.004 0.03 0.013" pos="0.124 0 0.012" material="pcb_blue"/>
+      <geom class="visual" type="cylinder" size="0.008 0.006" pos="0.132 0.014 0.012" zaxis="1 0 0" material="steel"/>
+      <geom class="visual" type="cylinder" size="0.008 0.006" pos="0.132 -0.014 0.012" zaxis="1 0 0" material="steel"/>
+      <!-- site: invisible reference point. The rangefinder measures along its +z axis, hence zaxis="1 0 0" (forward).
+           group="3": hidden from cameras (so it isn't mistaken for the green cube) -->
+      <site name="sonar_site" pos="0.14 0 0.012" zaxis="1 0 0" size="0.004" rgba="0 1 0 1" group="3"/>
+
+      <!-- Front camera: mounted on a bracket IN FRONT of the sonar, so neither the sonar nor the wheels
+           block the view. Tilted 30° down: sees the ground just ahead of the bumper and the horizon.
+           fovy="80" = wide-angle lens.
+           xyaxes: image right = -y, image up = (0.5 0 0.866) → camera looks forward and 30° down -->
+      <geom class="visual" type="box" size="0.022 0.006 0.002" pos="0.12 0 0.049" material="aluminum"/>
+      <geom class="visual" type="box" size="0.008 0.015 0.008" pos="0.142 0 0.045" material="plastic_black"/>
+      <geom class="visual" type="cylinder" size="0.006 0.002" pos="0.15 0 0.045" zaxis="1 0 0" material="lens"/>
+      <camera name="front_cam" pos="0.153 0 0.045" xyaxes="0 -1 0 0.5 0 0.866" fovy="80"/>
+
+      <!-- Headlights: emissive yellow spheres. Note: placing <light> elements here rendered the whole
+           robot black, so only the "glowing" look is kept -->
+      <geom class="visual" type="sphere" size="0.009" pos="0.126 0.045 -0.004" material="headlight_mat"/>
+      <geom class="visual" type="sphere" size="0.009" pos="0.126 -0.045 -0.004" material="headlight_mat"/>
+
+      <!-- Camera following the robot from behind (pick it in the viewer's "Camera" menu) -->
+      <camera name="chase_cam" pos="-0.5 0 0.3" xyaxes="0 -1 0 0.5 0 1"/>
+      <!-- Extra cameras that move with the robot -->
+      <camera name="front_view" pos="0.5 0 0.2" xyaxes="0 1 0 -0.2 0 1"/>
+      <camera name="left_view" pos="0 0.5 0.15" xyaxes="-1 0 0 0 -0.1 1"/>
+      <camera name="top_view" pos="0 0 0.8" xyaxes="0 -1 0 1 0 0"/>
+      <!-- targetbody: always looks at "forearm" (close-up of the arm) -->
+      <camera name="arm_closeup" pos="0.25 0.25 0.3" mode="targetbody" target="forearm"/>
+
+      <!-- ===== Front wheels: STEERED =====
+           The knuckle rotates about z (steering),
+           the wheel inside it rotates about y (rolling). -->
+      <body name="front_left_knuckle" pos="0.09 0.09 -0.015">
+        <joint name="front_left_steer" type="hinge" axis="0 0 1" range="-0.5 0.5" armature="0.005" damping="0.05"/>
+        <geom class="visual" type="box" size="0.006 0.004 0.012" pos="0 -0.021 0" material="aluminum" mass="0.01"/>
+        <body name="front_left_wheel">
+          <joint name="front_left_wheel_joint" type="hinge" axis="0 1 0" damping="0.001"/>
+          <geom class="wheel"/>
+          <geom class="hub"/>
+        </body>
+      </body>
+      <body name="front_right_knuckle" pos="0.09 -0.09 -0.015">
+        <joint name="front_right_steer" type="hinge" axis="0 0 1" range="-0.5 0.5" armature="0.005" damping="0.05"/>
+        <geom class="visual" type="box" size="0.006 0.004 0.012" pos="0 0.021 0" material="aluminum" mass="0.01"/>
+        <body name="front_right_wheel">
+          <joint name="front_right_wheel_joint" type="hinge" axis="0 1 0" damping="0.001"/>
+          <geom class="wheel"/>
+          <geom class="hub"/>
+        </body>
+      </body>
+
+      <!-- ===== Rear wheels: DRIVEN by motors ===== -->
+      <body name="rear_left_wheel" pos="-0.09 0.09 -0.015">
+        <joint name="rear_left_wheel_joint" type="hinge" axis="0 1 0" armature="0.005" damping="0.001"/>
+        <geom class="wheel"/>
+        <geom class="hub"/>
+      </body>
+      <body name="rear_right_wheel" pos="-0.09 -0.09 -0.015">
+        <joint name="rear_right_wheel_joint" type="hinge" axis="0 1 0" armature="0.005" damping="0.001"/>
+        <geom class="wheel"/>
+        <geom class="hub"/>
+      </body>
+
+      <!-- ===== 4-DOF ARM: yaw -> shoulder -> elbow -> wrist -> gripper ===== -->
+      <body name="arm_base" pos="0.03 0 0.051" childclass="arm_link">
+        <!-- DOF 1: the whole arm turns left/right about z -->
+        <joint name="arm_yaw" axis="0 0 1" range="-1.57 1.57"/>
+        <geom size="0.02 0.022 0.015" pos="0 0 0.017" material="servo"/>
+
+        <body name="upper_arm" pos="0 0 0.035">
+          <!-- DOF 2: shoulder, tilts forward/backward about y -->
+          <joint name="shoulder" axis="0 1 0" range="-0.6 1.9"/>
+          <!-- black cube = servo (shows where the joint is) -->
+          <geom size="0.015 0.026 0.015" material="servo"/>
+          <geom size="0.012 0.02 0.06" pos="0 0 0.06"/>
+
+          <body name="forearm" pos="0 0 0.12">
+            <!-- DOF 3: elbow -->
+            <joint name="elbow" axis="0 1 0" range="-2.2 2.2"/>
+            <geom size="0.015 0.026 0.015" material="servo"/>
+            <geom size="0.012 0.018 0.05" pos="0 0 0.05" material="aluminum"/>
+
+            <!-- Webcam on top of the arm (like the real kit) -->
+            <geom size="0.015 0.035 0.015" pos="0 0 0.125" material="plastic_black"/>
+            <geom type="cylinder" size="0.009 0.002" pos="0.016 0 0.125" zaxis="1 0 0" material="lens"/>
+            <!-- Cameras look along their -z. xyaxes: image right = -y, image up tilted back,
+                 so the camera looks forward and about 25° down -->
+            <camera name="arm_camera" pos="0.02 0 0.125" xyaxes="0 -1 0 0.423 0 0.906" fovy="75"/>
+
+            <body name="gripper" pos="0 0 0.1">
+              <!-- DOF 4: wrist, tilts the gripper up/down -->
+              <joint name="wrist" axis="0 1 0" range="-2 2"/>
+              <geom size="0.015 0.026 0.015" material="servo"/>
+              <!-- grip_site: point between the two fingers, where objects are held.
+                   group="3": hidden from cameras (otherwise it is mistaken for the red apple) -->
+              <site name="grip_site" pos="0.07 0 0" size="0.004" rgba="1 0 0 0.5" group="3"/>
+              <geom name="palm" size="0.02 0.02 0.008" pos="0.03 0 0" material="aluminum" contype="1" conaffinity="1"/>
+              <!-- Fingers open with slide (linear) joints. 0 = closed, 0.025 = open -->
+              <body name="left_finger" pos="0.055 0.005 0">
+                <joint name="left_finger_slide" type="slide" axis="0 1 0" range="0 0.025" damping="0.5"/>
+                <geom size="0.02 0.003 0.01" pos="0.015 0 0" material="steel"
+                      contype="1" conaffinity="1" mass="0.01" friction="2 0.01 0.001"/>
+              </body>
+              <body name="right_finger" pos="0.055 -0.005 0">
+                <joint name="right_finger_slide" type="slide" axis="0 -1 0" range="0 0.025" damping="0.5"/>
+                <geom size="0.02 0.003 0.01" pos="0.015 0 0" material="steel"
+                      contype="1" conaffinity="1" mass="0.01" friction="2 0.01 0.001"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- ===================== WORLD ===================== -->
+    <!-- Apple: a small sphere the arm can grasp -->
+    <body name="apple" pos="0.8 0.3 0.03">
+      <freejoint/>
+      <!-- condim="6": enables rolling friction. Without it a sphere rolls forever, like a ball on ice.
+           friction = sliding, torsional, rolling -->
+      <geom type="sphere" size="0.02" rgba="0.9 0.1 0.1 1" mass="0.03" condim="6" friction="1.5 0.01 0.005"/>
+    </body>
+    <!-- Small cubes -->
+    <body name="blue_cube" pos="0.6 -0.4 0.02">
+      <freejoint/>
+      <geom type="box" size="0.015 0.015 0.015" rgba="0.2 0.4 0.9 1" mass="0.02"/>
+    </body>
+    <body name="green_cube" pos="1.0 -0.1 0.02">
+      <freejoint/>
+      <geom type="box" size="0.015 0.015 0.015" rgba="0.2 0.8 0.3 1" mass="0.02"/>
+    </body>
+    <!-- Obstacle (for testing the sonar) -->
+    <geom name="obstacle" type="box" size="0.05 0.3 0.1" pos="2 0 0.1" rgba="0.6 0.6 0.65 1"/>
+  </worldbody>
+
+  <!-- Disable some collisions: a steered wheel must not catch on the chassis edge -->
+  <contact>
+    <exclude body1="chassis" body2="front_left_wheel"/>
+    <exclude body1="chassis" body2="front_right_wheel"/>
+  </contact>
+
+  <!-- equality: couples two joints. joint1 = joint2 -->
+  <equality>
+    <!-- Right wheel steers together with the left one (like a single steering servo) -->
+    <joint joint1="front_right_steer" joint2="front_left_steer"/>
+    <!-- Right finger moves together with the left one (like a single gripper servo) -->
+    <joint joint1="right_finger_slide" joint2="left_finger_slide"/>
+  </equality>
+
+  <!-- actuator: motors. These are the "Control" sliders in the viewer's right panel -->
+  <actuator>
+    <!-- velocity: holds a target angular speed (rad/s). 20 rad/s * 0.045 m = 0.9 m/s -->
+    <velocity name="rear_left_motor" joint="rear_left_wheel_joint" kv="0.3" ctrlrange="-20 20" forcerange="-0.6 0.6"/>
+    <velocity name="rear_right_motor" joint="rear_right_wheel_joint" kv="0.3" ctrlrange="-20 20" forcerange="-0.6 0.6"/>
+    <!-- position: drives a joint to a target angle (like a servo) -->
+    <position name="steering" joint="front_left_steer" kp="3" ctrlrange="-0.5 0.5" forcerange="-1 1"/>
+    <!-- forcerange: servo torque limit (N·m). Real hobby servos give ~1 N·m, so the arm
+         can't shove the whole car when it touches the floor -->
+    <position name="arm_yaw" joint="arm_yaw" kp="5" ctrlrange="-1.57 1.57" forcerange="-1 1"/>
+    <position name="shoulder" joint="shoulder" kp="15" ctrlrange="-0.6 1.9" forcerange="-1.5 1.5"/>
+    <position name="elbow" joint="elbow" kp="10" ctrlrange="-2.2 2.2" forcerange="-1 1"/>
+    <position name="wrist" joint="wrist" kp="5" ctrlrange="-2 2" forcerange="-0.5 0.5"/>
+    <!-- gripper: larger kp = firmer squeeze. forcerange = maximum grip force (N) -->
+    <position name="gripper" joint="left_finger_slide" kp="150" ctrlrange="0 0.025" forcerange="-3 3"/>
+  </actuator>
+
+  <!-- sensor: measurements, read in Python through data.sensor(...) -->
+  <sensor>
+    <rangefinder name="sonar" site="sonar_site" cutoff="2"/>
+    <jointpos name="steering_angle" joint="front_left_steer"/>
+    <jointvel name="rear_left_speed" joint="rear_left_wheel_joint"/>
+    <framepos name="chassis_pos" objtype="body" objname="chassis"/>
+  </sensor>
+</mujoco>
