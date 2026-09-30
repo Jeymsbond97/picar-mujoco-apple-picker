@@ -4,6 +4,10 @@ A simulated robot car, modeled after the **Adeept PiCar Pro V2** kit, that **fin
 
 Everything runs in [MuJoCo](https://mujoco.org): the robot model is written from scratch in MJCF, perception uses OpenCV on rendered camera frames, and the controller is a hand-written state machine with a P-controller and analytic inverse kinematics.
 
+![demo](media/demo.gif)
+
+*Left: the robot's front camera with the detection and current state. Right: third-person view. Three random apple placements, played at 2× speed — [full-length video (MP4)](media/demo.mp4).*
+
 | Robot | Front camera + detection (left) / chase camera (right) |
 |---|---|
 | ![robot](media/robot.png) | ![approach](media/approach.png) |
@@ -11,8 +15,6 @@ Everything runs in [MuJoCo](https://mujoco.org): the robot model is written from
 | Grasping | Holding the apple |
 |---|---|
 | ![grasp](media/grasp.png) | ![holding](media/holding.png) |
-
-> 🎥 Demo video: *coming soon*
 
 ## Results
 
@@ -94,11 +96,12 @@ vision.py         Apple detection (HSV mask + shape filter)
 arm.py            Pixel → 3D, inverse kinematics, pick sequence
 apple_seeker.py   Autonomous brain: search, approach, grasp (live windows)
 evaluate.py       Headless benchmark over random apple placements
+record_demo.py    Renders the demo video straight from the simulation
 camera_view.py    Live front-camera view with detection
 teleop.py         Keyboard control in the MuJoCo viewer (macOS)
 world.xml         First MuJoCo scene (floor, light, falling box)
 car.xml           Early 4-wheel car prototype
-media/            Screenshots
+media/            Demo video, GIF and screenshots
 ```
 
 ## Getting started
@@ -118,6 +121,7 @@ pip install -r requirements.txt
 ```bash
 python apple_seeker.py      # autonomous search & pick-up — press r for a new random apple, q to quit
 python evaluate.py 50       # benchmark (headless)
+python record_demo.py       # render media/demo.mp4 (front camera + third-person view)
 python camera_view.py       # live camera + detection while driving in a circle
 mjpython teleop.py          # keyboard control (macOS: the passive viewer requires mjpython)
 python -m mujoco.viewer --mjcf=picar.xml   # just look at the model
