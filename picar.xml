@@ -111,6 +111,21 @@
       <!-- site: invisible reference point. The rangefinder measures along its +z axis, hence zaxis="1 0 0" (forward).
            group="3": hidden from cameras (so it isn't mistaken for the green cube) -->
       <site name="sonar_site" pos="0.14 0 0.012" zaxis="1 0 0" size="0.004" rgba="0 1 0 1" group="3"/>
+      <!-- A real ultrasonic sensor sends a cone, not a thin ray. One ray misses obstacles that are off to the
+           side of the 24 cm-wide car, so the cone is approximated by a fan of rays: ±15° and ±30°.
+           zaxis = (cos a, sin a, 0) -->
+      <site name="sonar_left_15_site" pos="0.14 0.01 0.012" zaxis="0.966 0.259 0" size="0.004" group="3"/>
+      <site name="sonar_left_30_site" pos="0.14 0.01 0.012" zaxis="0.866 0.5 0" size="0.004" group="3"/>
+      <site name="sonar_right_15_site" pos="0.14 -0.01 0.012" zaxis="0.966 -0.259 0" size="0.004" group="3"/>
+      <site name="sonar_right_30_site" pos="0.14 -0.01 0.012" zaxis="0.866 -0.5 0" size="0.004" group="3"/>
+      <!-- Corner sensors at the front corners, looking 60° outward: the fan above can't see what is right
+           beside the front wheels, and that blind spot is where the car used to clip obstacles while turning -->
+      <site name="corner_left_site" pos="0.13 0.115 0.012" zaxis="0.5 0.866 0" size="0.004" group="3"/>
+      <site name="corner_right_site" pos="0.13 -0.115 0.012" zaxis="0.5 -0.866 0" size="0.004" group="3"/>
+      <!-- Side sensors next to the rear wheels, looking straight out. When a car turns, its inner rear wheel
+           cuts the corner, so an obstacle the front has already passed can still be clipped by the rear -->
+      <site name="side_left_site" pos="-0.06 0.115 0.012" zaxis="0 1 0" size="0.004" group="3"/>
+      <site name="side_right_site" pos="-0.06 -0.115 0.012" zaxis="0 -1 0" size="0.004" group="3"/>
 
       <!-- Front camera: mounted on a bracket IN FRONT of the sonar, so neither the sonar nor the wheels
            block the view. Tilted 30° down: sees the ground just ahead of the bumper and the horizon.
@@ -239,6 +254,16 @@
     </body>
     <!-- Obstacle (for testing the sonar) -->
     <geom name="obstacle" type="box" size="0.05 0.3 0.1" pos="2 0 0.1" rgba="0.6 0.6 0.65 1"/>
+
+    <!-- Obstacles the robot must drive around. Python moves them to random spots for every episode
+         (apple_seeker.place_obstacles_randomly). None of them is red, so they can't be mistaken for the apple.
+         All are taller than the sonar (~7 cm above the ground), so the sonar can see them. -->
+    <geom name="block_1" type="box" size="0.06 0.06 0.08" pos="0.5 0.6 0.08" rgba="0.55 0.55 0.6 1"/>
+    <geom name="block_2" type="box" size="0.12 0.04 0.08" pos="-0.6 0.5 0.08" rgba="0.6 0.45 0.25 1"/>
+    <geom name="block_3" type="box" size="0.04 0.1 0.1" pos="-0.5 -0.6 0.1" rgba="0.25 0.35 0.7 1"/>
+    <geom name="pillar_1" type="cylinder" size="0.05 0.1" pos="0.9 0.9 0.1" rgba="0.85 0.75 0.2 1"/>
+    <geom name="pillar_2" type="cylinder" size="0.07 0.08" pos="-0.9 0 0.08" rgba="0.3 0.6 0.35 1"/>
+    <geom name="block_4" type="box" size="0.08 0.08 0.12" pos="0.2 -1.0 0.12" rgba="0.45 0.45 0.5 1"/>
   </worldbody>
 
   <!-- Disable some collisions: a steered wheel must not catch on the chassis edge -->
@@ -275,6 +300,14 @@
   <!-- sensor: measurements, read in Python through data.sensor(...) -->
   <sensor>
     <rangefinder name="sonar" site="sonar_site" cutoff="2"/>
+    <rangefinder name="sonar_left_15" site="sonar_left_15_site" cutoff="2"/>
+    <rangefinder name="sonar_left_30" site="sonar_left_30_site" cutoff="2"/>
+    <rangefinder name="sonar_right_15" site="sonar_right_15_site" cutoff="2"/>
+    <rangefinder name="sonar_right_30" site="sonar_right_30_site" cutoff="2"/>
+    <rangefinder name="corner_left" site="corner_left_site" cutoff="2"/>
+    <rangefinder name="corner_right" site="corner_right_site" cutoff="2"/>
+    <rangefinder name="side_left" site="side_left_site" cutoff="2"/>
+    <rangefinder name="side_right" site="side_right_site" cutoff="2"/>
     <jointpos name="steering_angle" joint="front_left_steer"/>
     <jointvel name="rear_left_speed" joint="rear_left_wheel_joint"/>
     <framepos name="chassis_pos" objtype="body" objname="chassis"/>

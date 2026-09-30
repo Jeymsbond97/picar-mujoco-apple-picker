@@ -40,10 +40,9 @@ def label(image, text):
 
 def record_episode(writer, rng, number, total):
     mujoco.mj_resetData(seeker.model, seeker.data)
-    seeker.reset_arm()
     for _ in range(300):
         mujoco.mj_step(seeker.model, seeker.data)
-    seeker.place_apple_randomly(rng)
+    seeker.new_scene(rng)   # random apple + random obstacles
 
     memory, pick = seeker.new_memory(), None
     start = seeker.data.time
