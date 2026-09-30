@@ -4,7 +4,7 @@ Record a demo video straight from the simulation (no screen capture needed).
 Left half:  the robot's front camera with the detection overlay and the current state.
 Right half: a third-person camera that follows the car.
 
-Run:   python record_demo.py                  → media/demo.mp4 (3 episodes)
+Run:   python record_demo.py                  → media/demo_obstacles.mp4 (3 episodes)
        python record_demo.py --episodes 5 --seed 11
 """
 import argparse
@@ -65,7 +65,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=3)
     parser.add_argument("--seed", type=int, default=3)
-    parser.add_argument("--output", default="media/demo.mp4")
+    parser.add_argument("--output", default="media/demo_obstacles.mp4")
     args = parser.parse_args()
 
     size = (2 * seeker.IMAGE_WIDTH, seeker.IMAGE_HEIGHT)

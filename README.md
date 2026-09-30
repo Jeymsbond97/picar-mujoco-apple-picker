@@ -4,9 +4,9 @@ A simulated robot car, modeled after the **Adeept PiCar Pro V2** kit, that **fin
 
 Everything runs in [MuJoCo](https://mujoco.org): the robot model is written from scratch in MJCF, perception uses OpenCV on rendered camera frames, obstacles are sensed with simulated range sensors, and the controller is a hand-written state machine with a P-controller, a potential-field obstacle avoider and analytic inverse kinematics.
 
-![demo](media/demo.gif)
+![demo](media/demo_obstacles.gif)
 
-*Left: the robot's front camera with the detection and current state. Right: third-person view. Random apple and obstacle placements, played at 2× speed — [full-length video (MP4)](media/demo.mp4).*
+*Left: the robot's front camera with the detection and current state. Right: third-person view. Random apple and obstacle placements, played at 2× speed — [full-length video (MP4)](media/demo_obstacles.mp4).*
 
 | Robot | Front camera + detection (left) / chase camera (right) |
 |---|---|
@@ -166,7 +166,7 @@ pip install -r requirements.txt
 ```bash
 python apple_seeker.py         # autonomous run — press r for a new random apple + obstacles, q to quit
 python evaluate.py 30 --seed 1 # benchmark (headless)
-python record_demo.py          # render media/demo.mp4 (front camera + third-person view)
+python record_demo.py          # render media/demo_obstacles.mp4 (front camera + third-person view)
 python camera_view.py          # live camera + detection while driving in a circle
 mjpython teleop.py             # keyboard control (macOS: the passive viewer requires mjpython)
 python -m mujoco.viewer --mjcf=picar.xml   # just look at the model
