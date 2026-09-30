@@ -64,7 +64,7 @@ def record_episode(writer, rng, number, total):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=3)
-    parser.add_argument("--seed", type=int, default=3)
+    parser.add_argument("--seed", type=int, default=4)
     parser.add_argument("--output", default="media/demo_obstacles.mp4")
     args = parser.parse_args()
 

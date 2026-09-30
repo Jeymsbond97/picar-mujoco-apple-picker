@@ -6,7 +6,7 @@ Everything runs in [MuJoCo](https://mujoco.org): the robot model is written from
 
 ![demo](media/demo_obstacles.gif)
 
-*Left: the robot's front camera with the detection and current state. Right: third-person view. Random apple and obstacle placements, played at 2× speed — [full-length video (MP4)](media/demo_obstacles.mp4).*
+*Left: the robot's front camera with the detection and current state. Right: third-person view. Random apple and obstacle placements, played at 3× speed — [full-length video (MP4)](media/demo_obstacles.mp4).*
 
 | Robot | Front camera + detection (left) / chase camera (right) |
 |---|---|
